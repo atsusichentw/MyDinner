@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>晚餐吃什麼？14天不重複自訂抽籤器 (GitHub Pages 雲端同步版)</title>
+    <title>晚餐吃什麼？14天不重複自訂抽籤器 (GitHub Pages 雲端雙向同步版)</title>
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
     <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.10.0/font/bootstrap-icons.css" rel="stylesheet">
     <style>
@@ -71,7 +71,7 @@
 
     <div class="text-center mb-5">
         <h1 class="display-5 fw-bold text-danger"><i class="bi bi-egg-fried me-2"></i>晚餐吃什麼？</h1>
-        <p class="lead text-muted">登入後將自動於 Google 雲端硬碟建立「Dinner_History_Sync」試算表記錄每次晚餐！</p>
+        <p class="lead text-muted">登入後將自動讀寫 Google 試算表「Dinner_History_Sync」，完美同步 14 天歷史紀錄！</p>
     </div>
 
     <div class="row g-4 flex-row-reverse">
@@ -191,12 +191,10 @@
 
     async function initializeGapiClient() {
         try {
-            // 🌟 核心修正：僅作基礎 client 初始化，避免在 init 時請求不穩定的 Discovery Docs 網址
             await gapi.client.init({
                 apiKey: API_KEY,
             });
             
-            // 🌟 手動分開加載 API 模組（避免 404 及 Discovery 缺欄位問題）
             await gapi.client.load('sheets', 'v4');
             await gapi.client.load('drive', 'v3');
             
@@ -225,7 +223,6 @@
         }
     }
 
-    // 當兩者都載入完成，解鎖並啟用按鈕
     function maybeEnableButtons() {
         if (gapiInited && gisiInited) {
             setLoginButtonState(true, '<i class="bi bi-google text-danger"></i> 使用 Google 帳號登入');
@@ -240,7 +237,6 @@
         }
     }
 
-    // 自動登入檢查：確認本地瀏覽器是否有可用的 Token 暫存
     function checkLocalAuthToken() {
         const token = localStorage.getItem('google_access_token');
         if (token) {
@@ -252,7 +248,6 @@
         }
     }
 
-    // Google 帳號授權登入
     function handleAuthClick() {
         if (!gapiInited || !gisiInited) {
             alert('Google SDK 尚未載入完畢，請稍候重試！');
@@ -278,7 +273,6 @@
         tokenClient.requestAccessToken({ prompt: 'select_account' });
     }
 
-    // 登出
     function handleSignoutClick() {
         const token = gapi.client.getToken();
         if (token !== null) {
@@ -295,7 +289,6 @@
         }
     }
 
-    // 取得使用者個人資料
     function fetchUserProfile(accessToken) {
         fetch(`https://www.googleapis.com/oauth2/v3/userinfo?access_token=${accessToken}`)
             .then(res => res.json())
@@ -308,7 +301,7 @@
             .catch(err => console.error("無法讀取用戶個人檔：", err));
     }
 
-    // 搜尋或自動建立試算表
+    // 搜尋或自動建立試算表，建立後自動讀取雲端歷史
     async function initGoogleSheet() {
         if (!isLoggedIn) return;
 
@@ -318,10 +311,10 @@
             if (cachedSheetId) {
                 spreadsheetId = cachedSheetId;
                 updateSyncStatusUI(true, "雲端試算表連線成功！");
+                await fetchHistoryFromGoogleSheet(); // 🌟 讀取雲端歷史
                 return;
             }
 
-            // 搜尋雲端硬碟中是否已有 Dinner_History_Sync 試算表
             const response = await gapi.client.drive.files.list({
                 q: "name = 'Dinner_History_Sync' and mimeType = 'application/vnd.google-apps.spreadsheet' and trashed = false",
                 fields: 'files(id, name)',
@@ -333,10 +326,10 @@
                 spreadsheetId = files[0].id;
                 localStorage.setItem('linked_spreadsheet_id', spreadsheetId);
                 updateSyncStatusUI(true, "已找到現有試算表，連線成功！");
+                await fetchHistoryFromGoogleSheet(); // 🌟 讀取雲端歷史
             } else {
                 updateSyncStatusUI(true, "正在建立新試算表...");
                 
-                // 建立預設標題行的試算表格式
                 const spreadsheet = {
                     properties: { title: 'Dinner_History_Sync' },
                     sheets: [{
@@ -363,10 +356,57 @@
                 spreadsheetId = createResponse.result.spreadsheetId;
                 localStorage.setItem('linked_spreadsheet_id', spreadsheetId);
                 updateSyncStatusUI(true, "試算表建立成功！");
+                updateHistoryUI(); // 空白新表，維持當下
             }
         } catch (err) {
             console.error("試算表初始化失敗：", err);
             updateSyncStatusUI(true, "同步失敗，請重新登入", "bg-danger");
+        }
+    }
+
+    // 🌟 新增：從 Google Sheets 雙向讀取 14 天晚餐歷史紀錄
+    async function fetchHistoryFromGoogleSheet() {
+        if (!isLoggedIn || !spreadsheetId) return;
+
+        try {
+            const response = await gapi.client.sheets.spreadsheets.values.get({
+                spreadsheetId: spreadsheetId,
+                range: '晚餐紀錄庫!A2:C', // 讀取 A 到 C 欄（排除標題列）
+            });
+
+            const rows = response.result.values;
+            if (rows && rows.length > 0) {
+                let tempHistory = [];
+                
+                // 由舊到新（從上往下）掃描試算表記錄
+                rows.forEach(row => {
+                    const dinnerName = row[1];
+                    const actionType = row[2];
+
+                    if (actionType === "抽中新晚餐") {
+                        // 如果抽中了，加入歷史，並保持最大 14 天長度限制
+                        tempHistory.push(dinnerName);
+                        if (tempHistory.length > 14) {
+                            tempHistory.shift();
+                        }
+                    } else if (actionType === "手動移除歷史 (解除排除限制)") {
+                        // 移除特定某一筆歷史
+                        tempHistory = tempHistory.filter(item => item !== dinnerName);
+                    } else if (actionType === "全部清除歷史") {
+                        // 清空歷史
+                        tempHistory = [];
+                    }
+                });
+
+                // 更新本機變數與快取，並渲染 UI
+                history = tempHistory;
+                localStorage.setItem('dinnerHistory14', JSON.stringify(history));
+                updateHistoryUI();
+                updateMenuUI();
+                console.log("已從 Google Sheets 同步還原 14 天歷史:", history);
+            }
+        } catch (err) {
+            console.error("無法自 Google Sheets 讀取歷史資料：", err);
         }
     }
 
@@ -379,7 +419,7 @@
         } else {
             badge.className = "badge bg-warning text-dark";
             badge.innerHTML = "未登入 (本地儲存)";
-            document.getElementById('loginBtn').classList.remove('d-none');
+            document.getElementById('loginBtn').className = 'btn btn-outline-dark d-flex align-items-center gap-2';
             document.getElementById('userInfo').classList.add('d-none');
         }
     }
