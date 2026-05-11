@@ -147,16 +147,12 @@
     // =========================================================================
     // ⚠️ 請填入你在 Google Cloud 控制台申請的憑證 ⚠️
     // =========================================================================
-    const CLIENT_ID = '562843998665-lifb2eo55nq1nsmh5rr6rn2dkrffocpc.apps.googleusercontent.com'; 
-    const API_KEY = 'AIzaSyDikxXx8y_NEtICRFIVyuSyNVT_s77ccW8'; 
+    const CLIENT_ID = 'YOUR_GOOGLE_CLIENT_ID.apps.googleusercontent.com'; 
+    const API_KEY = 'YOUR_GOOGLE_API_KEY'; 
     
     // 設定需要讀寫試算表及建立檔案的權限範圍
     const SCOPES = 'https://www.googleapis.com/auth/drive.file https://www.googleapis.com/auth/spreadsheets';
-    const DISCOVERY_DOCS = [
-        "https://www.googleapis.com/discovery/v1/apis/drive/v3/rest",
-        "https://sheets.googleapis.com/discovery/v1/apis/sheets/v4/rest"
-    ];
-
+    
     let tokenClient;
     let gapiInited = false;
     let gisiInited = false;
@@ -178,28 +174,62 @@
     // 初始化界面
     updateHistoryUI();
     updateMenuUI();
+    setLoginButtonState(false, "正在載入雲端模組...");
 
+    // 確保 Google API 載入完畢才啟動
     window.onload = function() {
-        gapi.load('client', initializeGapiClient);
-        gisInit();
+        try {
+            gapi.load('client', initializeGapiClient);
+            gisInit();
+        } catch (e) {
+            console.error("SDK 載入失敗，可能被瀏覽器插件阻擋:", e);
+            setLoginButtonState(false, "雲端模組遭瀏覽器阻擋");
+            document.getElementById('syncStatus').className = "badge bg-danger";
+            document.getElementById('syncStatus').innerText = "連線受阻 (請檢查 Adblock)";
+        }
     };
 
     async function initializeGapiClient() {
-        await gapi.client.init({
-            apiKey: API_KEY,
-            discoveryDocs: DISCOVERY_DOCS,
-        });
-        gapiInited = true;
-        checkLocalAuthToken();
+        try {
+            await gapi.client.init({
+                apiKey: API_KEY,
+                discoveryDocs: ["https://sheets.googleapis.com/discovery/v1/apis/sheets/v4/rest", "https://www.googleapis.com/discovery/v1/apis/drive/v3/rest"],
+            });
+            gapiInited = true;
+            maybeEnableButtons();
+            checkLocalAuthToken();
+        } catch (err) {
+            console.error("GAPI 初始化失敗:", err);
+        }
     }
 
     function gisInit() {
-        tokenClient = google.accounts.oauth2.initTokenClient({
-            client_id: CLIENT_ID,
-            scope: SCOPES,
-            callback: '', // 執行時動態指定
-        });
-        gisiInited = true;
+        try {
+            tokenClient = google.accounts.oauth2.initTokenClient({
+                client_id: CLIENT_ID,
+                scope: SCOPES,
+                callback: '', 
+            });
+            gisiInited = true;
+            maybeEnableButtons();
+        } catch (err) {
+            console.error("GIS 初始化失敗:", err);
+        }
+    }
+
+    // 當兩者都載入完成，解鎖並啟用按鈕
+    function maybeEnableButtons() {
+        if (gapiInited && gisiInited) {
+            setLoginButtonState(true, '<i class="bi bi-google text-danger"></i> 使用 Google 帳號登入');
+        }
+    }
+
+    function setLoginButtonState(enabled, htmlContent) {
+        const loginBtn = document.getElementById('loginBtn');
+        if (loginBtn) {
+            loginBtn.disabled = !enabled;
+            loginBtn.innerHTML = htmlContent;
+        }
     }
 
     // 自動登入檢查：確認本地瀏覽器是否有可用的 Token 暫存
@@ -251,6 +281,7 @@
                 isLoggedIn = false;
                 spreadsheetId = null;
                 updateSyncStatusUI(false);
+                setLoginButtonState(true, '<i class="bi bi-google text-danger"></i> 使用 Google 帳號登入');
                 alert("已成功登出，改回本地儲存模式。");
             });
         }
@@ -266,7 +297,7 @@
                 document.getElementById('userAvatar').src = data.picture || '';
                 document.getElementById('userName').innerText = data.name || '已登入用戶';
             })
-            .catch(err => console.error("無法讀取用戶頭像：", err));
+            .catch(err => console.error("無法讀取用戶個人檔：", err));
     }
 
     // 搜尋或自動建立試算表
@@ -295,7 +326,7 @@
                 localStorage.setItem('linked_spreadsheet_id', spreadsheetId);
                 updateSyncStatusUI(true, "已找到現有試算表，連線成功！");
             } else {
-                updateSyncStatusUI(true, "正在您的雲端硬碟建立新試算表...");
+                updateSyncStatusUI(true, "正在建立新試算表...");
                 
                 // 建立預設標題行的試算表格式
                 const spreadsheet = {
@@ -323,11 +354,11 @@
 
                 spreadsheetId = createResponse.result.spreadsheetId;
                 localStorage.setItem('linked_spreadsheet_id', spreadsheetId);
-                updateSyncStatusUI(true, "試算表建立並初始化完成！");
+                updateSyncStatusUI(true, "試算表建立成功！");
             }
         } catch (err) {
-            console.error("試算表連線或建立失敗：", err);
-            updateSyncStatusUI(true, "試算表同步失敗，請重試", "bg-danger");
+            console.error("試算表初始化失敗：", err);
+            updateSyncStatusUI(true, "同步失敗，請重新登入", "bg-danger");
         }
     }
 
@@ -450,95 +481,4 @@
 
         dinnerList.forEach((item, index) => {
             const li = document.createElement('li');
-            li.className = 'list-group-item d-flex justify-content-between align-items-center border-0 border-bottom px-0 py-2';
-            
-            const isExcluded = history.includes(item);
-            
-            let itemContent = '';
-            if (isExcluded) {
-                itemContent = `<span class="text-decoration-line-through text-muted"><i class="bi bi-slash-circle me-2"></i>${item} <small class="text-danger">(排除中)</small></span>`;
-            } else {
-                itemContent = `<span><i class="bi bi-check-circle-fill text-success me-2"></i>${item}</span>`;
-            }
-
-            li.innerHTML = `
-                ${itemContent}
-                <button class="btn btn-outline-danger btn-sm rounded-circle" onclick="deleteMenuItem(${index})" title="刪除此項目">
-                    <i class="bi bi-trash"></i>
-                </button>
-            `;
-            menuListEl.appendChild(li);
-        });
-    }
-
-    // 新增菜色
-    function addNewItem() {
-        const input = document.getElementById('newItemInput');
-        const newItem = input.value.trim();
-
-        if (newItem === '') {
-            alert('請輸入菜色名稱！');
-            return;
-        }
-
-        if (dinnerList.includes(newItem)) {
-            alert('這個菜色已經在你的菜單裡囉！');
-            return;
-        }
-
-        dinnerList.push(newItem);
-        localStorage.setItem('customDinnerList', JSON.stringify(dinnerList));
-        
-        input.value = ''; 
-        updateMenuUI();
-    }
-
-    function handleKeyPress(event) {
-        if (event.key === 'Enter') {
-            addNewItem();
-        }
-    }
-
-    // 刪除個別菜色
-    function deleteMenuItem(index) {
-        const deletedItem = dinnerList[index];
-        dinnerList.splice(index, 1);
-        localStorage.setItem('customDinnerList', JSON.stringify(dinnerList));
-        
-        history = history.filter(item => item !== deletedItem);
-        localStorage.setItem('dinnerHistory14', JSON.stringify(history));
-
-        updateMenuUI();
-        updateHistoryUI();
-    }
-
-    // 還原為預設清單
-    function resetMenuToDefault() {
-        if (confirm("確定要把自訂菜單全部清除，並還原成最初的 31 樣預設菜色嗎？")) {
-            dinnerList = [...defaultDinnerList];
-            localStorage.setItem('customDinnerList', JSON.stringify(dinnerList));
-            updateMenuUI();
-        }
-    }
-
-    // 清除所有歷史紀錄
-    function clearHistory(silent = false) {
-        if (silent) {
-            history = [];
-            localStorage.removeItem('dinnerHistory14');
-            updateHistoryUI();
-            updateMenuUI();
-            document.getElementById('result').innerText = '點擊下方按鈕抽籤';
-            
-            // 🌟 同步寫入試算表
-            logToGoogleSheet("全部紀錄", "全部清除歷史");
-        } else {
-            if (confirm("確定要清除最近 14 天的吃飯紀錄嗎？")) {
-                clearHistory(true);
-            }
-        }
-    }
-</script>
-
-</body>
-</html>
+            li.className = 'list-group-item d-flex justify
