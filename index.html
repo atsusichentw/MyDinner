@@ -191,15 +191,23 @@
 
     async function initializeGapiClient() {
         try {
+            // 🌟 核心修正：僅作基礎 client 初始化，避免在 init 時請求不穩定的 Discovery Docs 網址
             await gapi.client.init({
                 apiKey: API_KEY,
-                discoveryDocs: ["https://sheets.googleapis.com/discovery/v1/apis/sheets/v4/rest", "https://www.googleapis.com/discovery/v1/apis/drive/v3/rest"],
             });
+            
+            // 🌟 手動分開加載 API 模組（避免 404 及 Discovery 缺欄位問題）
+            await gapi.client.load('sheets', 'v4');
+            await gapi.client.load('drive', 'v3');
+            
             gapiInited = true;
             maybeEnableButtons();
             checkLocalAuthToken();
+            console.log("Google API 載入完畢！");
         } catch (err) {
             console.error("GAPI 初始化失敗:", err);
+            document.getElementById('syncStatus').className = "badge bg-danger";
+            document.getElementById('syncStatus').innerText = "金鑰驗證失敗 (請檢查 GCP 控制台限制)";
         }
     }
 
@@ -252,7 +260,7 @@
         }
 
         if (CLIENT_ID.startsWith('YOUR_GOOGLE')) {
-            alert('【設定提示】請先編輯 index.html 代碼，填入你在 Google Cloud 申請的 CLIENT_ID 與 API_KEY 才能正常運作喔！');
+            alert('【設定提示】請先編輯 dinner.html 代碼，填入你在 Google Cloud 申請的 CLIENT_ID 與 API_KEY 才能正常運作喔！');
             return;
         }
 
