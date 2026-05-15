@@ -3,56 +3,55 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>晚餐吃什麼？雲端強化同步版</title>
+    <title>晚餐抽籤器 - 修正穩定版</title>
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
     <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.10.0/font/bootstrap-icons.css" rel="stylesheet">
 </head>
 <body class="bg-light min-vh-100 py-5">
 
 <div class="container" style="max-width: 900px;">
-    <div class="d-flex flex-wrap justify-content-between align-items-center mb-4 bg-white p-3 rounded-4 shadow-sm gap-3 border-start border-primary border-5">
+    <div class="d-flex flex-wrap justify-content-between align-items-center mb-4 bg-white p-3 rounded-4 shadow-sm border-start border-primary border-5">
         <div class="d-flex align-items-center">
-            <div id="syncSpinner" class="spinner-border spinner-border-sm text-primary me-2 d-none" role="status"></div>
-            <span class="fw-bold text-secondary">同步狀態：</span>
-            <span id="syncStatus" class="badge bg-warning text-dark">初始化中...</span>
+            <div id="syncSpinner" class="spinner-border spinner-border-sm text-primary me-2 d-none"></div>
+            <span class="fw-bold text-secondary">狀態：</span>
+            <span id="syncStatus" class="badge bg-warning text-dark">初始化模組中...</span>
         </div>
         <div>
             <button id="loginBtn" class="btn btn-outline-dark d-flex align-items-center gap-2" onclick="handleAuthClick()" disabled>
-                <i class="bi bi-google"></i> 載入中...
+                <i class="bi bi-google"></i> 等待載入...
             </button>
             <div id="userInfo" class="d-none d-flex align-items-center gap-3">
-                <span id="userName" class="fw-bold text-dark small">使用者</span>
+                <span id="userName" class="fw-bold text-dark small">載入中...</span>
                 <button class="btn btn-sm btn-outline-danger rounded-pill" onclick="handleSignoutClick()">登出</button>
             </div>
         </div>
     </div>
 
     <div class="text-center mb-5">
-        <h1 class="display-5 fw-bold text-danger">晚餐抽籤器 <small class="fs-6 text-muted">Cloud Pro</small></h1>
+        <h1 class="display-5 fw-bold text-danger">晚餐抽籤器</h1>
     </div>
 
     <div class="row g-4">
         <div class="col-md-7">
             <div class="card border-0 shadow-lg p-4 rounded-4">
-                <div id="result" class="text-center display-4 fw-bold text-success py-5 mb-4 bg-light rounded-4 border-2 border-dashed" style="border: 2px dashed #dee2e6; min-height: 180px; display: flex; align-items: center; justify-content: center;">
-                    準備好抽籤了嗎？
+                <div id="result" class="text-center display-4 fw-bold text-success py-5 mb-4 bg-light rounded-4 border-2" style="border: 2px dashed #dee2e6; min-height: 180px; display: flex; align-items: center; justify-content: center;">
+                    準備抽籤
                 </div>
                 <button id="drawBtn" class="btn btn-danger btn-lg w-100 rounded-pill py-3 shadow" onclick="drawDinner()" disabled>
-                    等待雲端同步...
+                    等待雲端連線...
                 </button>
-                
                 <div class="mt-4">
-                    <h6 class="text-secondary fw-bold"><i class="bi bi-clock-history"></i> 14天排除清單：</h6>
+                    <h6 class="text-secondary fw-bold">最近紀錄：</h6>
                     <div id="historyList" class="d-flex flex-wrap gap-2 mt-2"></div>
                 </div>
             </div>
         </div>
-
+        
         <div class="col-md-5">
             <div class="card border-0 shadow p-4 rounded-4">
                 <h5 class="fw-bold mb-3">我的菜單</h5>
                 <div class="input-group mb-3">
-                    <input type="text" id="newItemInput" class="form-control" placeholder="新增菜色">
+                    <input type="text" id="newItemInput" class="form-control" placeholder="輸入新菜色">
                     <button class="btn btn-success" onclick="addNewItem()"><i class="bi bi-plus"></i></button>
                 </div>
                 <div class="overflow-auto" style="max-height: 300px;">
@@ -67,55 +66,56 @@
 <script src="https://apis.google.com/js/api.js" async defer></script>
 
 <script>
-    // 請替換您的憑證
+    // ⚠️ 這裡請務必填入你的憑證
     const CLIENT_ID = '562843998665-lifb2eo55nq1nsmh5rr6rn2dkrffocpc.apps.googleusercontent.com';
     const API_KEY = 'AIzaSyDikxXx8y_NEtICRFIVyuSyNVT_s77ccW8';
     const SCOPES = 'https://www.googleapis.com/auth/drive.file https://www.googleapis.com/auth/spreadsheets';
 
     let tokenClient;
     let spreadsheetId = null;
-    let isSyncing = false;
 
-    // 資料初始化
-    const defaultList = ["便當", "披薩", "義大利麵", "肉圓", "水餃", "鍋貼", "速食", "牛排", "火鍋", "壽司", "炒飯", "牛肉麵", "燒臘"];
+    const defaultList = ["便當", "披薩", "義大利麵", "肉圓", "水餃", "速食", "牛肉麵"];
     let dinnerList = JSON.parse(localStorage.getItem('customDinnerList')) || [...defaultList];
     let history = JSON.parse(localStorage.getItem('dinnerHistory14')) || [];
 
-    // 介面鎖定邏輯
-    function setAppReady(ready, statusText) {
-        const btn = document.getElementById('drawBtn');
-        const status = document.getElementById('syncStatus');
-        btn.disabled = !ready;
-        btn.innerText = ready ? "決定就是你了！" : "請先完成雲端登入";
-        if (statusText) status.innerText = statusText;
+    function updateStatus(text, bgClass = "bg-success") {
+        const badge = document.getElementById('syncStatus');
+        badge.innerText = text;
+        badge.className = `badge ${bgClass}`;
     }
 
-    // 初始化 Google SDK
     window.onload = () => {
         gapi.load('client', async () => {
-            await gapi.client.init({ apiKey: API_KEY });
-            await gapi.client.load('sheets', 'v4');
-            await gapi.client.load('drive', 'v3');
-            
-            tokenClient = google.accounts.oauth2.initTokenClient({
-                client_id: CLIENT_ID,
-                scope: SCOPES,
-                callback: async (resp) => {
-                    if (resp.error) return;
-                    localStorage.setItem('google_access_token', resp.access_token);
-                    await startSyncFlow(resp.access_token);
-                }
-            });
+            try {
+                await gapi.client.init({ apiKey: API_KEY });
+                await gapi.client.load('sheets', 'v4');
+                await gapi.client.load('drive', 'v3');
+                
+                tokenClient = google.accounts.oauth2.initTokenClient({
+                    client_id: CLIENT_ID,
+                    scope: SCOPES,
+                    callback: async (resp) => {
+                        if (resp.error) {
+                            updateStatus("登入被拒絕", "bg-danger");
+                            return;
+                        }
+                        localStorage.setItem('google_access_token', resp.access_token);
+                        await startSyncFlow(resp.access_token);
+                    }
+                });
 
-            // 檢查是否已有 Token
-            const savedToken = localStorage.getItem('google_access_token');
-            if (savedToken) {
-                gapi.client.setToken({ access_token: savedToken });
-                startSyncFlow(savedToken);
-            } else {
                 document.getElementById('loginBtn').disabled = false;
                 document.getElementById('loginBtn').innerHTML = '<i class="bi bi-google"></i> 使用 Google 登入';
-                setAppReady(false, "未登入 (本地模式)");
+                
+                const savedToken = localStorage.getItem('google_access_token');
+                if (savedToken) {
+                    gapi.client.setToken({ access_token: savedToken });
+                    startSyncFlow(savedToken);
+                } else {
+                    updateStatus("本地模式 (未登入)", "bg-warning text-dark");
+                }
+            } catch (err) {
+                updateStatus("SDK 初始化失敗", "bg-danger");
             }
         });
         updateMenuUI();
@@ -123,46 +123,47 @@
     };
 
     async function startSyncFlow(token) {
-        showLoading(true);
+        document.getElementById('syncSpinner').classList.remove('d-none');
         try {
-            // 1. 取得用戶資訊
+            // 修正 undefined 問題：加入判斷與備援
             const userResp = await fetch(`https://www.googleapis.com/oauth2/v3/userinfo?access_token=${token}`);
             const userData = await userResp.json();
+            
             document.getElementById('loginBtn').classList.add('d-none');
             document.getElementById('userInfo').classList.remove('d-none');
-            document.getElementById('userName').innerText = userData.name;
+            // 如果 userData.name 是 undefined，則顯示 '已登入用戶'
+            document.getElementById('userName').innerText = userData.name || userData.email || "已登入用戶";
 
-            // 2. 初始化試算表 (關鍵：使用 await 確保順序)
             await initSheet();
-            
-            // 3. 從雲端抓取歷史 (避免本地與雲端不一致)
             await syncHistoryFromCloud();
-
-            setAppReady(true, "雲端同步已就緒");
+            
+            updateStatus("雲端連線成功");
+            document.getElementById('drawBtn').disabled = false;
+            document.getElementById('drawBtn').innerText = "決定就是你了！";
         } catch (e) {
-            console.error(e);
-            setAppReady(false, "同步失敗，請重新登入");
+            console.error("同步流程出錯:", e);
+            updateStatus("同步失敗，請重新登入", "bg-danger");
+            // Token 可能過期，清除它
             localStorage.removeItem('google_access_token');
         } finally {
-            showLoading(false);
+            document.getElementById('syncSpinner').classList.add('d-none');
         }
     }
 
     async function initSheet() {
-        const fileName = 'Dinner_History_Sync';
         const res = await gapi.client.drive.files.list({
-            q: `name = '${fileName}' and trashed = false`,
+            q: "name = 'Dinner_History_Sync' and trashed = false",
             fields: 'files(id)'
         });
 
-        if (res.result.files.length > 0) {
+        if (res.result.files && res.result.files.length > 0) {
             spreadsheetId = res.result.files[0].id;
         } else {
+            updateStatus("正在建立雲端試算表...", "bg-info");
             const ss = await gapi.client.sheets.spreadsheets.create({
-                resource: { properties: { title: fileName } }
+                resource: { properties: { title: 'Dinner_History_Sync' } }
             });
             spreadsheetId = ss.result.spreadsheetId;
-            // 寫入表頭
             await gapi.client.sheets.spreadsheets.values.update({
                 spreadsheetId: spreadsheetId,
                 range: 'Sheet1!A1:C1',
@@ -180,7 +181,6 @@
         });
         const rows = res.result.values;
         if (rows) {
-            // 重新解析 14 天紀錄 (這部分邏輯維持你的業務需求)
             let tempHistory = [];
             rows.forEach(r => {
                 if (r[2] === "抽中") {
@@ -196,7 +196,7 @@
 
     async function drawDinner() {
         const pool = dinnerList.filter(i => !history.includes(i));
-        if (pool.length === 0) return alert("全部都吃過囉！請清除歷史或增加菜色。");
+        if (pool.length === 0) return alert("菜單都吃過一遍了！請清除歷史紀錄。");
 
         const picked = pool[Math.floor(Math.random() * pool.length)];
         document.getElementById('result').innerText = picked;
@@ -208,21 +208,20 @@
         updateHistoryUI();
         updateMenuUI();
 
-        // 同步寫入雲端
         if (spreadsheetId) {
-            showLoading(true);
-            await gapi.client.sheets.spreadsheets.values.append({
-                spreadsheetId: spreadsheetId,
-                range: 'Sheet1!A:C',
-                valueInputOption: 'USER_ENTERED',
-                resource: { values: [[new Date().toLocaleString(), picked, "抽中"]] }
-            });
-            showLoading(false);
+            document.getElementById('syncSpinner').classList.remove('d-none');
+            try {
+                await gapi.client.sheets.spreadsheets.values.append({
+                    spreadsheetId: spreadsheetId,
+                    range: 'Sheet1!A:C',
+                    valueInputOption: 'USER_ENTERED',
+                    resource: { values: [[new Date().toLocaleString(), picked, "抽中"]] }
+                });
+            } catch (err) {
+                updateStatus("寫入雲端失敗", "bg-danger");
+            }
+            document.getElementById('syncSpinner').classList.add('d-none');
         }
-    }
-
-    function showLoading(show) {
-        document.getElementById('syncSpinner').classList.toggle('d-none', !show);
     }
 
     function handleAuthClick() {
@@ -230,28 +229,22 @@
     }
 
     function handleSignoutClick() {
-        const token = gapi.client.getToken();
-        if (token) {
-            google.accounts.oauth2.revoke(token.access_token);
-            gapi.client.setToken(null);
-            localStorage.removeItem('google_access_token');
-            location.reload();
-        }
+        localStorage.removeItem('google_access_token');
+        location.reload();
     }
 
-    // UI 更新函式 (保持原本邏輯)
     function updateMenuUI() {
         const el = document.getElementById('menuList');
         el.innerHTML = dinnerList.map((item, idx) => `
-            <li class="list-group-item d-flex justify-content-between align-items-center ${history.includes(item) ? 'opacity-50' : ''}">
-                ${item} ${history.includes(item) ? '<span class="badge bg-light text-dark">排除中</span>' : ''}
-                <button class="btn btn-sm text-danger" onclick="deleteItem(${idx})"><i class="bi bi-x-lg"></i></button>
+            <li class="list-group-item d-flex justify-content-between align-items-center ${history.includes(item) ? 'opacity-50 text-decoration-line-through' : ''}">
+                ${item}
+                <button class="btn btn-sm text-danger" onclick="deleteItem(${idx})"><i class="bi bi-trash"></i></button>
             </li>`).join('');
     }
 
     function updateHistoryUI() {
         const el = document.getElementById('historyList');
-        el.innerHTML = history.map(item => `<span class="badge bg-secondary p-2 rounded-pill">${item}</span>`).join('');
+        el.innerHTML = history.map(item => `<span class="badge bg-secondary rounded-pill">${item}</span>`).join('');
     }
 
     function addNewItem() {
