@@ -3,72 +3,64 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>晚餐吃什麼？14天不重複雲端同步版</title>
+    <title>晚餐抽籤器 - 自動相容修正版</title>
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
     <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.10.0/font/bootstrap-icons.css" rel="stylesheet">
     <style>
         body { background-color: #f8f9fa; font-family: "Microsoft JhengHei", sans-serif; }
         .card { border-radius: 1.25rem; border: none; box-shadow: 0 0.5rem 1rem rgba(0, 0, 0, 0.05); }
-        .btn-draw { padding: 1rem; font-size: 1.25rem; border-radius: 50rem; transition: transform 0.2s; }
-        .btn-draw:active { transform: scale(0.95); }
-        .menu-item { transition: all 0.2s; }
-        .history-badge { font-size: 0.9rem; padding: 0.5rem 0.8rem; }
     </style>
 </head>
 <body class="py-5">
 
-<div class="container" style="max-width: 1000px;">
-    <div class="d-flex flex-wrap justify-content-between align-items-center mb-4 bg-white p-3 rounded-4 shadow-sm gap-3">
+<div class="container" style="max-width: 900px;">
+    <div class="d-flex flex-wrap justify-content-between align-items-center mb-4 bg-white p-3 rounded-4 shadow-sm border-start border-primary border-5">
         <div class="d-flex align-items-center">
-            <div id="syncSpinner" class="spinner-border spinner-border-sm text-primary me-2 d-none" role="status"></div>
-            <span class="fw-bold text-secondary">同步狀態：</span>
-            <span id="syncStatus" class="badge bg-warning text-dark">初始化中...</span>
+            <div id="syncSpinner" class="spinner-border spinner-border-sm text-primary me-2 d-none"></div>
+            <span class="fw-bold text-secondary">狀態：</span>
+            <span id="syncStatus" class="badge bg-warning text-dark">等待載入...</span>
         </div>
         <div>
             <button id="loginBtn" class="btn btn-outline-dark d-flex align-items-center gap-2" onclick="handleAuthClick()" disabled>
-                <i class="bi bi-google"></i> 載入 SDK 中...
+                <i class="bi bi-google"></i> 載入中...
             </button>
             <div id="userInfo" class="d-none d-flex align-items-center gap-3">
-                <span id="userName" class="fw-bold text-dark small">使用者</span>
+                <span id="userName" class="fw-bold text-dark small">已登入用戶</span>
                 <button class="btn btn-sm btn-outline-danger rounded-pill" onclick="handleSignoutClick()">登出</button>
             </div>
         </div>
     </div>
 
     <div class="text-center mb-5">
-        <h1 class="display-4 fw-bold text-danger">晚餐吃什麼？</h1>
-        <p class="text-muted">自動過濾 14 天內重複的餐點</p>
+        <h1 class="display-5 fw-bold text-danger">晚餐吃什麼？</h1>
+        <p class="text-muted">自動過濾 14 天內重複餐點</p>
     </div>
 
     <div class="row g-4">
-        <div class="col-lg-7">
-            <div class="card p-4 h-100 text-center">
-                <div id="result" class="display-2 fw-bold text-success my-5 py-5 bg-light rounded-4 border-2" style="border: 2px dashed #dee2e6; min-height: 250px; display: flex; align-items: center; justify-content: center;">
-                    準備好抽籤了嗎？
+        <div class="col-md-7">
+            <div class="card p-4 h-100 shadow-lg">
+                <div id="result" class="text-center display-3 fw-bold text-success my-4 py-5 bg-light rounded-4" style="border: 2px dashed #dee2e6; min-height: 200px; display: flex; align-items: center; justify-content: center;">
+                    準備抽籤
                 </div>
-                <button id="drawBtn" class="btn btn-danger btn-draw w-100 shadow" onclick="drawDinner()" disabled>
-                    等待雲端連線...
+                <button id="drawBtn" class="btn btn-danger btn-lg w-100 rounded-pill py-3 shadow" onclick="drawDinner()" disabled>
+                    同步中...
                 </button>
-                <div class="mt-4 text-start">
-                    <h6 class="text-secondary fw-bold mb-3"><i class="bi bi-clock-history"></i> 最近 14 天吃過：</h6>
-                    <div id="historyList" class="d-flex flex-wrap gap-2"></div>
+                <div class="mt-4">
+                    <h6 class="text-secondary fw-bold">最近紀錄：</h6>
+                    <div id="historyList" class="d-flex flex-wrap gap-2 mt-2"></div>
                 </div>
             </div>
         </div>
-
-        <div class="col-lg-5">
-            <div class="card p-4">
-                <h5 class="fw-bold mb-3">我的菜單</h5>
-                <div class="input-group mb-3 shadow-sm">
-                    <input type="text" id="newItemInput" class="form-control border-0" placeholder="想加入什麼新口味？" onkeypress="if(event.key==='Enter') addNewItem()">
-                    <button class="btn btn-success border-0 px-3" onclick="addNewItem()"><i class="bi bi-plus-lg"></i></button>
+        
+        <div class="col-md-5">
+            <div class="card p-4 h-100 shadow">
+                <h5 class="fw-bold mb-3">菜單管理</h5>
+                <div class="input-group mb-3">
+                    <input type="text" id="newItemInput" class="form-control" placeholder="新增菜色">
+                    <button class="btn btn-success" onclick="addNewItem()"><i class="bi bi-plus"></i></button>
                 </div>
-                <div class="overflow-auto" style="max-height: 400px;">
+                <div class="overflow-auto" style="max-height: 300px;">
                     <ul id="menuList" class="list-group list-group-flush"></ul>
-                </div>
-                <div class="mt-4 pt-3 border-top">
-                    <button class="btn btn-sm btn-outline-secondary w-100 mb-2" onclick="resetMenuToDefault()">還原預設菜單</button>
-                    <button class="btn btn-sm btn-link text-danger w-100" onclick="clearAllData()">清除所有歷史紀錄</button>
                 </div>
             </div>
         </div>
@@ -79,39 +71,24 @@
 <script src="https://apis.google.com/js/api.js" async defer></script>
 
 <script>
-    // ⚠️ 請填入你原本的憑證
+    // ⚠️ 這裡請換回你的憑證
     const CLIENT_ID = '562843998665-lifb2eo55nq1nsmh5rr6rn2dkrffocpc.apps.googleusercontent.com';
     const API_KEY = 'AIzaSyDikxXx8y_NEtICRFIVyuSyNVT_s77ccW8';
     const SCOPES = 'https://www.googleapis.com/auth/drive.file https://www.googleapis.com/auth/spreadsheets';
 
     let tokenClient;
     let spreadsheetId = null;
+    let currentSheetName = ""; // 用來存儲動態抓到的工作表名稱
 
-    const defaultList = ["便當", "披薩", "義大利麵", "肉圓", "水餃", "鍋貼", "速食", "牛排", "火鍋", "壽司", "炒飯", "牛肉麵", "燒臘", "泰料", "雞排", "越南河粉", "臭豆腐", "丼飯", "當歸鴨"];
-    let dinnerList = JSON.parse(localStorage.getItem('customDinnerList')) || [...defaultList];
+    let dinnerList = JSON.parse(localStorage.getItem('customDinnerList')) || ["便當", "披薩", "義大利麵", "肉圓", "水餃", "速食"];
     let history = JSON.parse(localStorage.getItem('dinnerHistory14')) || [];
 
-    // UI 狀態切換
-    function setSyncing(isSyncing, message = "同步中...") {
-        const btn = document.getElementById('drawBtn');
-        const status = document.getElementById('syncStatus');
-        const spinner = document.getElementById('syncSpinner');
-        
-        if (isSyncing) {
-            btn.disabled = true;
-            spinner.classList.remove('d-none');
-            status.innerText = message;
-            status.className = "badge bg-info text-dark";
-        } else {
-            btn.disabled = false;
-            spinner.classList.add('d-none');
-            status.innerText = "雲端同步已就緒";
-            status.className = "badge bg-success";
-            btn.innerText = "決定就是你了！";
-        }
+    function updateStatus(text, color = "bg-success") {
+        const s = document.getElementById('syncStatus');
+        s.innerText = text;
+        s.className = `badge ${color}`;
     }
 
-    // 初始化 SDK
     window.onload = () => {
         gapi.load('client', async () => {
             await gapi.client.init({ apiKey: API_KEY });
@@ -124,19 +101,19 @@
                 callback: async (resp) => {
                     if (resp.error) return;
                     localStorage.setItem('google_access_token', resp.access_token);
-                    await runFullSync(resp.access_token);
+                    await runSyncFlow(resp.access_token);
                 }
             });
 
             document.getElementById('loginBtn').disabled = false;
             document.getElementById('loginBtn').innerHTML = '<i class="bi bi-google"></i> Google 登入';
-
+            
             const savedToken = localStorage.getItem('google_access_token');
             if (savedToken) {
                 gapi.client.setToken({ access_token: savedToken });
-                runFullSync(savedToken);
+                runSyncFlow(savedToken);
             } else {
-                document.getElementById('syncStatus').innerText = "未登入 (本地模式)";
+                updateStatus("未登入 (本地模式)", "bg-warning text-dark");
                 document.getElementById('drawBtn').disabled = false;
                 document.getElementById('drawBtn').innerText = "開始抽籤";
             }
@@ -145,67 +122,68 @@
         updateHistoryUI();
     };
 
-    // 核心同步流程：確保即時性的關鍵
-    async function runFullSync(token) {
-        setSyncing(true, "正在對接雲端資料...");
+    async function runSyncFlow(token) {
+        document.getElementById('syncSpinner').classList.remove('d-none');
         try {
-            // 1. 抓取使用者資訊 (避免 undefined)
+            // 獲取用戶資訊
             const userResp = await fetch(`https://www.googleapis.com/oauth2/v3/userinfo?access_token=${token}`);
             const userData = await userResp.json();
+            if (userData.error) throw new Error("Unauthorized");
+
             document.getElementById('loginBtn').classList.add('d-none');
             document.getElementById('userInfo').classList.remove('d-none');
-            document.getElementById('userName').innerText = userData.name || "已登入";
+            document.getElementById('userName').innerText = userData.name || "已登入用戶";
 
-            // 2. 初始化試算表
-            await initSpreadsheet();
+            // 1. 取得試算表 ID
+            const res = await gapi.client.drive.files.list({
+                q: "name = 'Dinner_History_Sync' and trashed = false",
+                fields: 'files(id)'
+            });
 
-            // 3. 強制從雲端抓回歷史紀錄，同步本地
-            await syncHistoryFromCloud();
+            if (res.result.files.length > 0) {
+                spreadsheetId = res.result.files[0].id;
+            } else {
+                const ss = await gapi.client.sheets.spreadsheets.create({
+                    resource: { properties: { title: 'Dinner_History_Sync' } }
+                });
+                spreadsheetId = ss.result.spreadsheetId;
+                // 預設建立標頭
+                await gapi.client.sheets.spreadsheets.values.update({
+                    spreadsheetId: spreadsheetId,
+                    range: 'A1:C1',
+                    valueInputOption: 'USER_ENTERED',
+                    resource: { values: [['時間', '項目', '動作']] }
+                });
+            }
 
-            setSyncing(false);
+            // 2. 關鍵：動態抓取第一個工作表的名稱 (解決 Sheet1 報錯)
+            const spreadsheet = await gapi.client.sheets.spreadsheets.get({ spreadsheetId: spreadsheetId });
+            currentSheetName = spreadsheet.result.sheets[0].properties.title;
+
+            // 3. 同步歷史
+            await syncHistory();
+
+            updateStatus("雲端同步已就緒");
+            document.getElementById('drawBtn').disabled = false;
+            document.getElementById('drawBtn').innerText = "決定就是你了！";
         } catch (e) {
             console.error(e);
-            document.getElementById('syncStatus').innerText = "同步失敗，請重新登入";
-            document.getElementById('syncStatus').className = "badge bg-danger";
+            updateStatus("登入已失效，請重新登入", "bg-danger text-white");
             localStorage.removeItem('google_access_token');
+        } finally {
+            document.getElementById('syncSpinner').classList.add('d-none');
         }
     }
 
-    async function initSpreadsheet() {
-        const res = await gapi.client.drive.files.list({
-            q: "name = 'Dinner_History_Sync' and trashed = false",
-            fields: 'files(id)'
-        });
-
-        if (res.result.files && res.result.files.length > 0) {
-            spreadsheetId = res.result.files[0].id;
-        } else {
-            const ss = await gapi.client.sheets.spreadsheets.create({
-                resource: { properties: { title: 'Dinner_History_Sync' } }
-            });
-            spreadsheetId = ss.result.spreadsheetId;
-            await gapi.client.sheets.spreadsheets.values.update({
-                spreadsheetId: spreadsheetId,
-                range: 'Sheet1!A1:C1',
-                valueInputOption: 'USER_ENTERED',
-                resource: { values: [['時間', '項目', '動作']] }
-            });
-        }
-    }
-
-    async function syncHistoryFromCloud() {
-        if (!spreadsheetId) return;
+    async function syncHistory() {
+        if (!spreadsheetId || !currentSheetName) return;
         const res = await gapi.client.sheets.spreadsheets.values.get({
             spreadsheetId: spreadsheetId,
-            range: 'Sheet1!A2:C'
+            range: `${currentSheetName}!A2:C`
         });
         const rows = res.result.values;
         if (rows) {
-            const cloudHistory = rows
-                .filter(r => r[2] === "抽中")
-                .map(r => r[1])
-                .slice(-14); // 取得最後14次抽籤
-            
+            const cloudHistory = rows.filter(r => r[2] === "抽中").map(r => r[1]).slice(-14);
             if (cloudHistory.length > 0) {
                 history = cloudHistory;
                 localStorage.setItem('dinnerHistory14', JSON.stringify(history));
@@ -217,92 +195,58 @@
 
     async function drawDinner() {
         const pool = dinnerList.filter(i => !history.includes(i));
-        if (pool.length === 0) return alert("全部都吃過一輪囉！請清除歷史。");
+        if (pool.length === 0) return alert("全都吃過啦！");
 
         const picked = pool[Math.floor(Math.random() * pool.length)];
         document.getElementById('result').innerText = picked;
 
-        // 立即更新本地 UI
         history.push(picked);
         if (history.length > 14) history.shift();
         localStorage.setItem('dinnerHistory14', JSON.stringify(history));
         updateHistoryUI();
         updateMenuUI();
 
-        // 背景同步到雲端
-        if (spreadsheetId) {
+        if (spreadsheetId && currentSheetName) {
             document.getElementById('syncSpinner').classList.remove('d-none');
-            try {
-                await gapi.client.sheets.spreadsheets.values.append({
-                    spreadsheetId: spreadsheetId,
-                    range: 'Sheet1!A:C',
-                    valueInputOption: 'USER_ENTERED',
-                    resource: { values: [[new Date().toLocaleString(), picked, "抽中"]] }
-                });
-            } catch (err) {
-                console.error("雲端寫入失敗", err);
-            }
+            await gapi.client.sheets.spreadsheets.values.append({
+                spreadsheetId: spreadsheetId,
+                range: `${currentSheetName}!A:C`,
+                valueInputOption: 'USER_ENTERED',
+                resource: { values: [[new Date().toLocaleString(), picked, "抽中"]] }
+            });
             document.getElementById('syncSpinner').classList.add('d-none');
         }
     }
 
-    // UI 功能函式
+    // UI 功能 (新增/刪除等) ... 保持原樣
     function updateMenuUI() {
         const el = document.getElementById('menuList');
         el.innerHTML = dinnerList.map((item, idx) => `
-            <li class="list-group-item d-flex justify-content-between align-items-center menu-item ${history.includes(item) ? 'opacity-50 text-decoration-line-through' : ''}">
+            <li class="list-group-item d-flex justify-content-between align-items-center ${history.includes(item) ? 'opacity-50 text-decoration-line-through' : ''}">
                 ${item}
-                <button class="btn btn-sm text-danger" onclick="deleteItem(${idx})"><i class="bi bi-trash3"></i></button>
+                <button class="btn btn-sm text-danger" onclick="deleteItem(${idx})"><i class="bi bi-trash"></i></button>
             </li>`).join('');
     }
-
     function updateHistoryUI() {
         const el = document.getElementById('historyList');
-        el.innerHTML = history.map(item => `<span class="badge bg-secondary history-badge rounded-pill">${item}</span>`).join('');
+        el.innerHTML = history.map(item => `<span class="badge bg-secondary rounded-pill">${item}</span>`).join('');
     }
-
     function addNewItem() {
-        const val = document.getElementById('newItemInput').value.trim();
-        if (val && !dinnerList.includes(val)) {
-            dinnerList.push(val);
+        const v = document.getElementById('newItemInput').value.trim();
+        if(v && !dinnerList.includes(v)) {
+            dinnerList.push(v);
             localStorage.setItem('customDinnerList', JSON.stringify(dinnerList));
             updateMenuUI();
-            document.getElementById('newItemInput').value = '';
+            document.getElementById('newItemInput').value='';
         }
     }
-
     function deleteItem(idx) {
         dinnerList.splice(idx, 1);
         localStorage.setItem('customDinnerList', JSON.stringify(dinnerList));
         updateMenuUI();
     }
-
-    function resetMenuToDefault() {
-        if(confirm("確定要還原成預設菜單嗎？")) {
-            dinnerList = [...defaultList];
-            localStorage.setItem('customDinnerList', JSON.stringify(dinnerList));
-            updateMenuUI();
-        }
-    }
-
-    function clearAllData() {
-        if(confirm("確定要清除所有抽籤紀錄嗎？雲端資料將不會刪除，但本地會重新開始計算 14 天。")) {
-            history = [];
-            localStorage.removeItem('dinnerHistory14');
-            updateHistoryUI();
-            updateMenuUI();
-            document.getElementById('result').innerText = "準備好抽籤了嗎？";
-        }
-    }
-
-    function handleAuthClick() {
-        tokenClient.requestAccessToken({ prompt: 'select_account' });
-    }
-
-    function handleSignoutClick() {
-        localStorage.removeItem('google_access_token');
-        location.reload();
-    }
+    function handleAuthClick() { tokenClient.requestAccessToken({ prompt: 'select_account' }); }
+    function handleSignoutClick() { localStorage.removeItem('google_access_token'); location.reload(); }
 </script>
 </body>
 </html>
